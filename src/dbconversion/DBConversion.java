@@ -76,12 +76,15 @@ public class DBConversion {
    
    private static Boolean isHSQLDB = false;
    private static Boolean isMYSQL = false;
+   private static Boolean isMARIADB = false;
    
    // JDBC driver name and database URL
    private static final String JDBC_DRIVER_HSQLDB = "org.hsqldb.jdbc.JDBCDriver"; 
    private static final String JDBC_DRIVER_MYSQL = "com.mysql.jdbc.Driver";
+   private static final String JDBC_DRIVER_MARIADB = "org.mariadb.jdbc.Driver";   
    private static final String DB_URL_HSQLDB = "jdbc:hsqldb:hsql://192.168.1.51/xdb;shutdown=true";
    private static final String DB_URL_MYSQL = "jdbc:mysql://192.168.1.72/DAILY_TRANSACTIONS";
+   private static final String DB_URL_MARIADB = "jdbc:mariadb://192.168.1.72/DAILY_TRANSACTIONS";
    private static String URL="";
 
    //  Database credentials
@@ -117,7 +120,7 @@ public class DBConversion {
    private static Options buildOptions()
    {
        Option help   = new Option("help","help",false,"Help.");
-       Option DBType = new Option("dbtype","dbtype",true,"Data Base Type HSQLDB or MYSQL.");
+       Option DBType = new Option("dbtype","dbtype",true,"Data Base Type HSQLDB, MYSQL or MARIADB.");
        Option URL    = new Option("url","database-url",true,"Database URL");
        Option u      = new Option("u","user-name",true,"User Name.");
        Option p      = new Option("p","password",true,"Password.");
@@ -167,6 +170,11 @@ public class DBConversion {
                     isHSQLDB=false;
                     isMYSQL=true;
                 }//if//
+                else if(line.getOptionValue("dbtype").equalsIgnoreCase("MARIADB")) {
+                    isHSQLDB=false;
+                    isMYSQL=false;
+                    isMARIADB=true;
+                }
                 else {
                     throw new ParseException("Usage:");
                 }
@@ -389,14 +397,14 @@ public class DBConversion {
            if(isHSQLDB) {
               stmt.execute("SET DATABASE REFERENTIAL INTEGRITY FALSE;"); 
            }
-           if(isMYSQL) {
+           if(isMYSQL || isMARIADB) {
               stmt.execute("SET FOREIGN_KEY_CHECKS = 0");
            }
            stmt.execute("TRUNCATE TABLE " + ACCOUNT_TRANSACTIONS);
            if(isHSQLDB) {
               stmt.execute("ALTER TABLE " + ACCOUNT_TRANSACTIONS + " ALTER COLUMN ID RESTART WITH 1"); 
            }
-           if(isMYSQL) {
+           if(isMYSQL || isMARIADB) {
               stmt.execute("ALTER TABLE " + ACCOUNT_TRANSACTIONS + " AUTO_INCREMENT = 1");
            }
 
@@ -404,13 +412,13 @@ public class DBConversion {
            if(isHSQLDB) {
               stmt.execute("ALTER TABLE " + TRANSACTION_DESCRIPTIONS + " ALTER COLUMN ID RESTART WITH 1");   
            }
-           if(isMYSQL) {
+           if(isMYSQL || isMARIADB) {
               stmt.execute("ALTER TABLE " + TRANSACTION_DESCRIPTIONS + " AUTO_INCREMENT = 1");
            }
            if(isHSQLDB) {
               stmt.execute("SET DATABASE REFERENTIAL INTEGRITY TRUE;"); 
            }
-           if(isMYSQL) {
+           if(isMYSQL || isMARIADB) {
               stmt.execute("SET FOREIGN_KEY_CHECKS = 1");
            }
        }
@@ -439,7 +447,7 @@ public class DBConversion {
        if(isHSQLDB) {
           sb.append(" COLUMN (" + TRANSACTION_DESCRIPTION + ") VALUES (?)");
        }
-       if(isMYSQL) {
+       if(isMYSQL || isMARIADB) {
           sb.append(" (" + TRANSACTION_DESCRIPTION + ") VALUES (?)");
        }
      
@@ -602,7 +610,7 @@ public class DBConversion {
        if(isHSQLDB) {
           sb.append(" COLUMN (");
        }
-       if(isMYSQL) {
+       if(isMYSQL || isMARIADB) {
           sb.append(" ("); 
        }
        sb.append(TRANSACTION_TIMESTAMP + ","); 
@@ -648,6 +656,9 @@ public class DBConversion {
                ps.setDouble(2, tl.getTranAmount());
               // ps.setInt(3, fk.getAccountID());
                Integer accountKey = accountKeysMap.get(tl.getTranAccount());
+               if(accountKey == null) {
+                  System.out.println("Debug Null Account Key" + tl.getTranNote() + " " + tl.getTranDateString() + " " + tl.getTranAccount() + " " + tl.getTranAmount());
+               }   
                ps.setInt(3, accountKey);
                //ps.setLong(4, fk.getDescriptionID());
                Long descriptionKey = descriptionKeysMap.get(tl.getTranNote());
@@ -821,6 +832,9 @@ public class DBConversion {
        }
        if(isHSQLDB) {
           conn = getDatabaseConnection(JDBC_DRIVER_HSQLDB,URL,USER,PASS);
+       }
+       if(isMARIADB) {
+           conn = getDatabaseConnection(JDBC_DRIVER_MARIADB,URL,USER,PASS);
        }
        if(conn == null)
            System.exit(0);
